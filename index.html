@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 LED Vezérlő</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#008CBA">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background: #f4f4f9; }
+        button { padding: 15px 30px; font-size: 18px; margin: 10px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; }
+        .connect { background-color: #008CBA; color: white; }
+        .on { background-color: #4CAF50; color: white; }
+        .off { background-color: #f44336; color: white; }
+        #status { font-size: 18px; font-weight: bold; color: #555; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h1>ESP32-C3 App Vezérlő</h1>
+    <div id="status">Állapot: Készen áll</div>
+    <button class="connect" id="connectBtn">CSATLAKOZÁS</button>
+    <br><br>
+    <button class="on" id="onBtn" disabled>LED BE</button>
+    <button class="off" id="offBtn" disabled>LED KI</button>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').then(() => console.log('SW kész!'));
+        }
+
+        const SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+        const CHARACTERISTIC_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+        let ledCharacteristic = null;
+        let bleDevice = null;
+
+        const connectBtn = document.getElementById('connectBtn');
+        const onBtn = document.getElementById('onBtn');
+        const offBtn = document.getElementById('offBtn');
+        const statusDiv = document.getElementById('status');
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                statusDiv.innerText = "Keresés...";
+                bleDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'C3-SUPERMINI' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+                statusDiv.innerText = "Kapcsolódás...";
+                const server = await bleDevice.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                ledCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+                statusDiv.innerText = "Sikeresen kapcsolódva! 🎉";
+                onBtn.disabled = false; offBtn.disabled = false; connectBtn.disabled = true;
+            } catch (error) { statusDiv.innerText = "Hiba: " + error.message; }
+        });
+
+        async function sendCommand(value) {
+            if (ledCharacteristic) {
+                try {
+                    const encoder = new TextEncoder();
+                    await ledCharacteristic.writeValue(encoder.encode(value));
+                } catch (error) { console.error(error); }
+            }
+        }
+        onBtn.addEventListener('click', () => sendCommand('1'));
+        offBtn.addEventListener('click', () => sendCommand('0'));
+    </script>
+</body>
+</html>

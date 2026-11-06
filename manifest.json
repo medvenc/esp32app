@@ -1,0 +1,16 @@
+{
+  "name": "ESP32 C3 LED",
+  "short_name": "ESP32 LED",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f4f4f9",
+  "theme_color": "#008CBA",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://flaticon.com",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
