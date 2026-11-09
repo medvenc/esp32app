@@ -83,7 +83,7 @@
 </head>
 <body>
     <div class="container">
-        <h2>Menetszabályzó</h2>
+        <h2>Menetszab</h2>
         <p id="statusTxt">Bluetooth: Nincs kapcsolódva</p>
         
         <div class="controls-row">
@@ -128,12 +128,6 @@
         let isForward = true;
         const encoder = new TextEncoder();
 
-        let currentDisplaySpeed = 0;
-        let intTargetSpeed = 0;
-        let intWeight = 10;
-        let simInterval = null;
-        let trainState = "E"; 
-
         let lastSpeedSentTime = 0;
         let lastWeightSentTime = 0;
 
@@ -165,57 +159,43 @@
                 document.getElementById('brakeBtn').disabled = false;
                 updateVisuals();
 
-                startLocalSimulation();
-
                 bleDevice.addEventListener('gattserverdisconnected', () => {
-                    clearInterval(simInterval);
                     location.reload();
                 });
             } catch (error) { statusTxt.innerText = "Hiba: " + error.message; }
         }
 
+        // TŰPONTOS ADATVEZÉRLÉS: A kijelzőt és a nyilakat kizárólag az ESP32-C3 vezérli!
         function handleNotifications(event) {
             let decoder = new TextDecoder('utf-8');
             let msg = decoder.decode(event.target.value);
             
             if(msg === "DIR_FWD") { isForward = true; updateVisuals(); } 
             else if(msg === "DIR_REV") { isForward = false; updateVisuals(); }
-            else if(msg === "U" || msg === "D" || msg === "E") {
-                trainState = msg; 
-                updateTrendIcon();
+            else if(msg.length > 0) {
+                char state = msg[0];
+                var speedVal = msg.substring(1);
+                
+                // Pályasebesség számának kiírása
+                document.getElementById('valNum').innerText = speedVal + '%';
+                document.getElementById('connectBtn').disabled = (parseInt(speedVal) !== 0);
+
+                // Nyilak kezelése szigorúan a kártya parancsára
+                const icon = document.getElementById('trendIcon');
+                if (state === "U") { icon.innerText = "▲"; icon.className = "trend-arrow trend-up"; }
+                else if (state === "D") { icon.innerText = "▼"; icon.className = "trend-arrow trend-down"; }
+                else if (state === "E") { icon.innerText = ""; }
             }
         }
 
-        function updateTrendIcon() {
-            const icon = document.getElementById('trendIcon');
-            if (trainState === "U") { icon.innerText = "▲"; icon.className = "trend-arrow trend-up"; }
-            else if (trainState === "D") { icon.innerText = "▼"; icon.className = "trend-arrow trend-down"; }
-            else { icon.innerText = ""; }
-        }
-
-        function startLocalSimulation() {
-            clearInterval(simInterval);
-            simInterval = setInterval(() => {
-                if (trainState === "U") {
-                    currentDisplaySpeed += (10.0 / intWeight);
-                    if (currentDisplaySpeed > intTargetSpeed) currentDisplaySpeed = intTargetSpeed;
-                } 
-                else if (trainState === "D") {
-                    currentDisplaySpeed -= (15.0 / intWeight);
-                    if (currentDisplaySpeed < intTargetSpeed) currentDisplaySpeed = intTargetSpeed;
-                }
-                else if (trainState === "E") {
-                    currentDisplaySpeed = intTargetSpeed; 
-                }
-
-                var roundedSpeed = Math.round(currentDisplaySpeed);
-                document.getElementById('valNum').innerText = roundedSpeed + '%';
-                document.getElementById('connectBtn').disabled = (roundedSpeed !== 0);
-            }, 50);
+        function updateVisuals() {
+            var boxL = document.getElementById('boxLeft');
+            var boxR = document.getElementById('boxRight');
+            if(isForward) { boxR.className = "dir-box active-fwd"; boxL.className = "dir-box inactive"; } 
+            else { boxL.className = "dir-box active-rev"; boxR.className = "dir-box inactive"; }
         }
 
         function sendValueRealTime(val) {
-            intTargetSpeed = parseInt(val);
             document.getElementById('targetNum').innerText = val + '%';
             const now = Date.now();
             if (now - lastSpeedSentTime > 50) { 
@@ -230,8 +210,8 @@
 
         function sendDynamicRealTime(val) {
             var sliderVal = parseInt(val);
-            intWeight = Math.round(10 + (sliderVal * 0.9));
-            document.getElementById('dynTxt').innerText = intWeight + '%';
+            var displayPercent = Math.round(10 + (sliderVal * 0.9));
+            document.getElementById('dynTxt').innerText = displayPercent + '%';
             const now = Date.now();
             if (now - lastWeightSentTime > 100) {
                 sendDynamic(sliderVal);
@@ -248,26 +228,16 @@
         }
         
         async function turnOff() {
-            intTargetSpeed = 0;
-            trainState = "E";
-            currentDisplaySpeed = 0;
             document.getElementById('ledSlider').value = 0;
             document.getElementById('targetNum').innerText = '0%';
-            updateTrendIcon();
             if(bleCharacteristic) { try { await bleCharacteristic.writeValue(encoder.encode('X')); } catch(e){} }
-        }
-
-        function updateVisuals() {
-            var boxL = document.getElementById('boxLeft');
-            var boxR = document.getElementById('boxRight');
-            if(isForward) { boxR.className = "dir-box active-fwd"; boxL.className = "dir-box inactive"; } 
-            else { boxL.className = "dir-box active-rev"; boxR.className = "dir-box inactive"; }
         }
 
         updateVisuals();
     </script>
 </body>
 </html>
+
 
 
 
