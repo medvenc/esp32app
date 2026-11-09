@@ -1,14 +1,14 @@
 {
-  "name": "ESP32 C3 LED",
-  "short_name": "ESP32 LED",
+  "name": "Vasuti Menetszabalyzo",
+  "short_name": "Vasut",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#f4f4f9",
-  "theme_color": "#008CBA",
+  "background_color": "#121212",
+  "theme_color": "#00adb5",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://flaticon.com",
+      "src": "ikon.png",
       "sizes": "512x512",
       "type": "image/png"
     }

@@ -1,69 +1,203 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 LED Vezérlő</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#008CBA">
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
+    <title>Vasúti Menetszabályzó</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background: #f4f4f9; }
-        button { padding: 15px 30px; font-size: 18px; margin: 10px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; }
-        .connect { background-color: #008CBA; color: white; }
-        .on { background-color: #4CAF50; color: white; }
-        .off { background-color: #f44336; color: white; }
-        #status { font-size: 18px; font-weight: bold; color: #555; margin-bottom: 20px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: #121212; color: #ffffff; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            min-height: 100vh; padding: 20px;
+        }
+        .container {
+            width: 100%; max-width: 500px; background: #1e1e1e;
+            padding: 40px 30px; border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center;
+        }
+        h2 { font-size: 2rem; margin-bottom: 5px; color: #00adb5; font-weight: 600; }
+        p { color: #888; margin-bottom: 35px; font-size: 1.1rem; }
+        
+        .controls-row {
+            display: flex; justify-content: space-between; align-items: center; gap: 15px;
+            margin-bottom: 30px; width: 100%;
+        }
+        .dir-box {
+            width: 60px; height: 60px; background: #252525; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s ease; border: 2px solid transparent;
+        }
+        .arrow { width: 35px; height: 35px; fill: #444; transition: all 0.3s ease; }
+        
+        .dir-box.active-fwd { background: rgba(0, 230, 118, 0.1); border-color: #00e676; box-shadow: 0 0 15px rgba(0, 230, 118, 0.3); }
+        .dir-box.active-fwd .arrow { fill: #00e676; }
+        .dir-box.active-rev { background: rgba(255, 23, 68, 0.1); border-color: #ff1744; box-shadow: 0 0 15px rgba(255, 23, 68, 0.3); }
+        .dir-box.active-rev .arrow { fill: #ff1744; }
+        .dir-box.inactive { background: #181818; border-color: #2da1a722; }
+        .dir-box.inactive .arrow { fill: #333; opacity: 0.3; }
+
+        .btn-dir {
+            flex: 1; padding: 14px 10px; font-size: 1rem; font-weight: bold;
+            border: 2px solid #00adb5; background: #393e46; color: #00adb5; 
+            border-radius: 12px; cursor: pointer; transition: all 0.3s ease;
+        }
+        .btn-dir:disabled {
+            background: #222831; color: #555; border: 2px solid #444; opacity: 0.3; cursor: not-allowed;
+        }
+
+        .slider-section { margin-bottom: 35px; text-align: left; }
+        .slider-label { font-size: 1.2rem; color: #aaa; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .target-val { font-size: 1.2rem; font-weight: bold; color: #00adb5; }
+        .power-val { font-size: 1rem; font-weight: bold; color: #ffffff; }
+        .power-label { font-size: 1rem; }
+        
+        .slider-container { width: 100%; }
+        input[type=range] {
+            -webkit-appearance: none; width: 100%; height: 12px;
+            border-radius: 10px; background: #333; outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 35px; height: 35px; border-radius: 50%;
+            background: #00adb5; cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 173, 181, 0.5);
+        }
+        #ledSlider::-webkit-slider-thumb { width: 45px; height: 45px; }
+        
+        .value-display { font-size: 3.5rem; font-weight: bold; color: #ffffff; margin-bottom: 5px; }
+        .value-title { font-size: 0.9rem; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
+        
+        .btn-off {
+            width: 100%; padding: 18px; font-size: 1.2rem; font-weight: bold;
+            border: none; border-radius: 15px; cursor: pointer; background: #ff2e63; color: white;
+            box-shadow: 0 5px 15px rgba(255, 46, 99, 0.4); margin-top: 10px;
+        }
     </style>
 </head>
 <body>
-    <h1>ESP32-C3 App Vezérlő</h1>
-    <div id="status">Állapot: Készen áll</div>
-    <button class="connect" id="connectBtn">CSATLAKOZÁS</button>
-    <br><br>
-    <button class="on" id="onBtn" disabled>LED BE</button>
-    <button class="off" id="offBtn" disabled>LED KI</button>
+    <div class="container">
+        <h2>Menetszabályzó</h2>
+        <p id="statusTxt">Bluetooth: Nincs kapcsolódva</p>
+        
+        <div class="controls-row">
+            <div class="dir-box" id="boxLeft"><svg class="arrow" viewBox="0 0 24 24"><path d="M14,7l-5,5l5,5V7Z"/></svg></div>
+            <button class="btn-dir" id="connectBtn" onclick="connectBluetooth()">CSATLAKOZÁS</button>
+            <div class="dir-box" id="boxRight"><svg class="arrow" viewBox="0 0 24 24"><path d="M10,17l5,-5l-5,-5V17Z"/></svg></div>
+        </div>
 
+        <div class="value-display" id="valNum">0%</div>
+        <div class="value-title">Pályasebesség (Aktuális)</div>
+        
+        <div class="slider-section">
+            <div class="slider-label"><span>Cél fordulatszám:</span><span class="target-val" id="targetNum">0%</span></div>
+            <div class="slider-container">
+                <input type='range' id='ledSlider' min='0' max='100' value='0' oninput='sendValue(this.value)' disabled>
+            </div>
+        </div>
+
+        <div class="slider-section">
+            <div class="slider-label"><span class="power-label">Vonattömeg:</span><span class="power-val" id="dynTxt">10%</span></div>
+            <div class="slider-container">
+                <input type='range' id='dynSlider' min='0' max='100' value='0' oninput='sendDynamic(this.value)' disabled>
+            </div>
+        </div>
+        
+        <button class="btn-off" id="brakeBtn" onclick="turnOff()" disabled>Vészfék</button>
+    </div>
+    
     <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').then(() => console.log('SW kész!'));
-        }
-
         const SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-        const CHARACTERISTIC_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
-        let ledCharacteristic = null;
+        const WRITE_UUID   = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+        const NOTIFY_UUID  = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+
+        let bleCharacteristic = null;
         let bleDevice = null;
+        let isForward = true;
+        const encoder = new TextEncoder();
 
-        const connectBtn = document.getElementById('connectBtn');
-        const onBtn = document.getElementById('onBtn');
-        const offBtn = document.getElementById('offBtn');
-        const statusDiv = document.getElementById('status');
-
-        connectBtn.addEventListener('click', async () => {
+        async function connectBluetooth() {
+            const statusTxt = document.getElementById('statusTxt');
+            const connectBtn = document.getElementById('connectBtn');
             try {
-                statusDiv.innerText = "Keresés...";
+                statusTxt.innerText = "Keresés...";
                 bleDevice = await navigator.bluetooth.requestDevice({
                     filters: [{ name: 'C3-SUPERMINI' }],
                     optionalServices: [SERVICE_UUID]
                 });
-                statusDiv.innerText = "Kapcsolódás...";
+
+                statusTxt.innerText = "Kapcsolódás...";
                 const server = await bleDevice.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
-                ledCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
-                statusDiv.innerText = "Sikeresen kapcsolódva! 🎉";
-                onBtn.disabled = false; offBtn.disabled = false; connectBtn.disabled = true;
-            } catch (error) { statusDiv.innerText = "Hiba: " + error.message; }
-        });
+                bleCharacteristic = await service.getCharacteristic(WRITE_UUID);
 
-        async function sendCommand(value) {
-            if (ledCharacteristic) {
-                try {
-                    const encoder = new TextEncoder();
-                    await ledCharacteristic.writeValue(encoder.encode(value));
-                } catch (error) { console.error(error); }
+                // Feliratkozás az aktuális sebességértékekre (Notify)
+                const notifyChar = await service.getCharacteristic(NOTIFY_UUID);
+                await notifyChar.startNotifications();
+                notifyChar.addEventListener('characteristicvaluechanged', handleNotifications);
+
+                statusTxt.innerText = "Kapcsolat kész! 🎉";
+                connectBtn.innerText = "MENETIRÁNY";
+                connectBtn.onclick = toggleDirection;
+                
+                document.getElementById('ledSlider').disabled = false;
+                document.getElementById('dynSlider').disabled = false;
+                document.getElementById('brakeBtn').disabled = false;
+                updateVisuals();
+
+                bleDevice.addEventListener('gattserverdisconnected', () => {
+                    statusTxt.innerText = "Kapcsolat megszakadt.";
+                    location.reload();
+                });
+            } catch (error) {
+                statusTxt.innerText = "Hiba: " + error.message;
             }
         }
-        onBtn.addEventListener('click', () => sendCommand('1'));
-        offBtn.addEventListener('click', () => sendCommand('0'));
+
+        function handleNotifications(event) {
+            let decoder = new TextDecoder('utf-8');
+            let msg = decoder.decode(event.target.value);
+            
+            if(msg === "DIR_FWD") { isForward = true; updateVisuals(); } 
+            else if(msg === "DIR_REV") { isForward = false; updateVisuals(); }
+            else if(msg.startsWith('A')) {
+                var actVal = msg.substring(1);
+                document.getElementById('valNum').innerText = actVal + '%';
+                document.getElementById('connectBtn').disabled = (parseInt(actVal) !== 0);
+            }
+        }
+
+        function updateVisuals() {
+            var boxL = document.getElementById('boxLeft');
+            var boxR = document.getElementById('boxRight');
+            if(isForward) { boxR.className = "dir-box active-fwd"; boxL.className = "dir-box inactive"; } 
+            else { boxL.className = "dir-box active-rev"; boxR.className = "dir-box inactive"; }
+        }
+
+        async function sendValue(val) {
+            document.getElementById('targetNum').innerText = val + '%';
+            if(bleCharacteristic) { await bleCharacteristic.writeValue(encoder.encode('V' + val)); }
+        }
+
+        async function sendDynamic(val) {
+            var sliderVal = parseInt(val);
+            var displayPercent = Math.round(10 + (sliderVal * 0.9));
+            document.getElementById('dynTxt').innerText = displayPercent + '%';
+            if(bleCharacteristic) { await bleCharacteristic.writeValue(encoder.encode('D' + sliderVal)); }
+        }
+        
+        async function toggleDirection() { 
+            if(bleCharacteristic) { await bleCharacteristic.writeValue(encoder.encode('T')); } 
+        }
+        
+        async function turnOff() {
+            document.getElementById('ledSlider').value = 0;
+            document.getElementById('targetNum').innerText = '0%';
+            if(bleCharacteristic) { await bleCharacteristic.writeValue(encoder.encode('X')); }
+        }
+
+        updateVisuals();
     </script>
 </body>
 </html>

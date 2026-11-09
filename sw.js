@@ -1,5 +1,5 @@
-const CACHE_NAME = 'esp32-v1';
-const ASSETS = ['index.html', 'manifest.json'];
+const CACHE_NAME = 'vasut-v1';
+const ASSETS = ['index.html', 'manifest.json', 'ikon.png'];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
 });
