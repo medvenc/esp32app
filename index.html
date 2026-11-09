@@ -95,20 +95,19 @@
         <div class="slider-section">
             <div class="slider-label"><span>Cél fordulatszám:</span><span class="target-val" id="targetNum">0%</span></div>
             <div class="slider-container">
-                <input type='range' id='ledSlider' min='0' max='100' value='0' oninput='sendValue(this.value)' disabled>
+                <input type='range' id='ledSlider' min='0' max='100' value='0' oninput='sendValueRealTime(this.value)' disabled>
             </div>
         </div>
 
         <div class="slider-section">
             <div class="slider-label"><span class="power-label">Vonattömeg:</span><span class="power-val" id="dynTxt">10%</span></div>
             <div class="slider-container">
-                <input type='range' id='dynSlider' min='0' max='100' value='0' oninput='sendDynamic(this.value)' disabled>
+                <input type='range' id='dynSlider' min='0' max='100' value='0' oninput='sendDynamicRealTime(this.value)' disabled>
             </div>
         </div>
         
         <button class="btn-off" id="brakeBtn" onclick="turnOff()" disabled>Vészfék</button>
     </div>
-    
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(() => console.log('SW kész!'));
@@ -123,13 +122,14 @@
         let isForward = true;
         const encoder = new TextEncoder();
 
+        let lastSpeedSentTime = 0;
+        let lastWeightSentTime = 0;
+
         async function connectBluetooth() {
             const statusTxt = document.getElementById('statusTxt');
             const connectBtn = document.getElementById('connectBtn');
             try {
                 statusTxt.innerText = "Keresés...";
-                
-                // AZ ATOMBIZTOS MEGOLDÁS: Kikapcsoltuk a szűrést, pontosan úgy, mint a LED programnál!
                 bleDevice = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: [SERVICE_UUID]
@@ -182,30 +182,47 @@
             else { boxL.className = "dir-box active-rev"; boxR.className = "dir-box inactive"; }
         }
 
-        async function sendValue(val) {
+        function sendValueRealTime(val) {
             document.getElementById('targetNum').innerText = val + '%';
-            if(bleCharacteristic) { await bleCharacteristic.writeValue(encoder.encode('V' + val)); }
+            const now = Date.now();
+            if (now - lastSpeedSentTime > 50) { 
+                sendValue(val);
+                lastSpeedSentTime = now;
+            }
         }
 
-        async function sendDynamic(val) {
+        async function sendValue(val) {
+            if(bleCharacteristic) { try { await bleCharacteristic.writeValue(encoder.encode('V' + val)); } catch(e){} }
+        }
+
+        function sendDynamicRealTime(val) {
             var sliderVal = parseInt(val);
             var displayPercent = Math.round(10 + (sliderVal * 0.9));
             document.getElementById('dynTxt').innerText = displayPercent + '%';
-            if(bleCharacteristic) { await bleCharacteristic.writeValue(encoder.encode('D' + sliderVal)); }
+            const now = Date.now();
+            if (now - lastWeightSentTime > 100) {
+                sendDynamic(sliderVal);
+                lastWeightSentTime = now;
+            }
         }
-        
+
+        async function sendDynamic(sliderVal) {
+            if(bleCharacteristic) { try { await bleCharacteristic.writeValue(encoder.encode('D' + sliderVal)); } catch(e){} }
+        }
+
         async function toggleDirection() { 
-            if(bleCharacteristic) { await bleCharacteristic.writeValue(encoder.encode('T')); } 
+            if(bleCharacteristic) { try { await bleCharacteristic.writeValue(encoder.encode('T')); } catch(e){} } 
         }
         
         async function turnOff() {
             document.getElementById('ledSlider').value = 0;
             document.getElementById('targetNum').innerText = '0%';
-            if(bleCharacteristic) { await bleCharacteristic.writeValue(encoder.encode('X')); }
+            if(bleCharacteristic) { try { await bleCharacteristic.writeValue(encoder.encode('X')); } catch(e){} }
         }
 
         updateVisuals();
     </script>
 </body>
 </html>
+
 
