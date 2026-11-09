@@ -4,8 +4,6 @@
     <meta charset='UTF-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
     <title>Vasúti Menetszabályzó</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#00adb5">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
@@ -83,7 +81,7 @@
 </head>
 <body>
     <div class="container">
-        <h2>Menetszb</h2>
+        <h2>Menetszabályzó</h2>
         <p id="statusTxt">Bluetooth: Nincs kapcsolódva</p>
         
         <div class="controls-row">
@@ -96,29 +94,26 @@
             <span id="trendIcon" class="trend-arrow"></span>
             <span id="valNum">0%</span>
         </div>
-        <div class="value-title">Pályasebesség (Aktuális)</div>
+        <div class="value-title">Pályasebesség (Cél)</div>
         
         <div class="slider-section">
             <div class="slider-label"><span>Cél fordulatszám:</span><span class="target-val" id="targetNum">0%</span></div>
             <div class="slider-container">
-                <input type='range' id='ledSlider' min='0' max='100' value='0' oninput='sendValueRealTime(this.value)' disabled>
+                <!-- oninput a 250ms-os finom követéshez, onchange a biztonsági végállomáshoz -->
+                <input type='range' id='ledSlider' min='0' max='100' value='0' oninput='handleSliderThrottle(this.value)' onchange='sendFinalValue(this.value)' disabled>
             </div>
         </div>
 
         <div class="slider-section">
             <div class="slider-label"><span class="power-label">Vonattömeg:</span><span class="power-val" id="dynTxt">10%</span></div>
             <div class="slider-container">
-                <input type='range' id='dynSlider' min='0' max='100' value='0' oninput='sendDynamicRealTime(this.value)' disabled>
+                <input type='range' id='dynSlider' min='0' max='100' value='0' oninput='handleWeightThrottle(this.value)' onchange='sendFinalWeight(this.value)' disabled>
             </div>
         </div>
         
         <button class="btn-off" id="brakeBtn" onclick="turnOff()" disabled>Vészfék</button>
     </div>
     <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').then(() => console.log('SW kész!'));
-        }
-
         const SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
         const WRITE_UUID   = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
         const NOTIFY_UUID  = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
@@ -128,8 +123,9 @@
         let isForward = true;
         const encoder = new TextEncoder();
 
-        let lastSpeedSentTime = 0;
-        let lastWeightSentTime = 0;
+        // Időzítő bélyegek a 250ms-os simításhoz
+        let lastSpeedTime = 0;
+        let lastWeightTime = 0;
 
         async function connectBluetooth() {
             const statusTxt = document.getElementById('statusTxt');
@@ -165,26 +161,17 @@
             } catch (error) { statusTxt.innerText = "Hiba: " + error.message; }
         }
 
-        // TŰPONTOS ADATVEZÉRLÉS: A kijelzőt és a nyilakat kizárólag az ESP32-C3 vezérli!
         function handleNotifications(event) {
             let decoder = new TextDecoder('utf-8');
-            let msg = decoder.decode(event.target.value);
+            let msg = decoder.decode(event.target.value).trim();
             
             if(msg === "DIR_FWD") { isForward = true; updateVisuals(); } 
             else if(msg === "DIR_REV") { isForward = false; updateVisuals(); }
-            else if(msg.length > 0) {
-                char state = msg[0];
-                var speedVal = msg.substring(1);
-                
-                // Pályasebesség számának kiírása
-                document.getElementById('valNum').innerText = speedVal + '%';
-                document.getElementById('connectBtn').disabled = (parseInt(speedVal) !== 0);
-
-                // Nyilak kezelése szigorúan a kártya parancsára
+            else if(msg === "U" || msg === "D" || msg === "E") {
                 const icon = document.getElementById('trendIcon');
-                if (state === "U") { icon.innerText = "▲"; icon.className = "trend-arrow trend-up"; }
-                else if (state === "D") { icon.innerText = "▼"; icon.className = "trend-arrow trend-down"; }
-                else if (state === "E") { icon.innerText = ""; }
+                if (msg === "U") { icon.innerText = "▲"; icon.className = "trend-arrow trend-up"; }
+                else if (msg === "D") { icon.innerText = "▼"; icon.className = "trend-arrow trend-down"; }
+                else if (msg === "E") { icon.innerText = ""; }
             }
         }
 
@@ -195,32 +182,41 @@
             else { boxL.className = "dir-box active-rev"; boxR.className = "dir-box inactive"; }
         }
 
-        function sendValueRealTime(val) {
+        // Húzás közben 250 ms-onként küldünk egy pozíciót a C3 követéséhez
+        function handleSliderThrottle(val) {
             document.getElementById('targetNum').innerText = val + '%';
+            document.getElementById('valNum').innerText = val + '%';
+            document.getElementById('connectBtn').disabled = (parseInt(val) !== 0);
+            
             const now = Date.now();
-            if (now - lastSpeedSentTime > 50) { 
-                sendValue(val);
-                lastSpeedSentTime = now;
+            if (now - lastSpeedTime > 250) { 
+                sendBluetoothCommand('V' + val);
+                lastSpeedTime = now;
             }
         }
 
-        async function sendValue(val) {
-            if(bleCharacteristic) { try { await bleCharacteristic.writeValue(encoder.encode('V' + val)); } catch(e){} }
+        // AMINT ELENGEDED vagy megállsz: Azonnal és kényszerítve kiküldjük a végső fix értéket!
+        async function sendFinalValue(val) {
+            await sendBluetoothCommand('V' + val);
         }
 
-        function sendDynamicRealTime(val) {
-            var sliderVal = parseInt(val);
-            var displayPercent = Math.round(10 + (sliderVal * 0.9));
+        function handleWeightThrottle(val) {
+            var displayPercent = Math.round(10 + (parseInt(val) * 0.9));
             document.getElementById('dynTxt').innerText = displayPercent + '%';
+            
             const now = Date.now();
-            if (now - lastWeightSentTime > 100) {
-                sendDynamic(sliderVal);
-                lastWeightSentTime = now;
+            if (now - lastWeightTime > 300) {
+                sendBluetoothCommand('D' + val);
+                lastWeightTime = now;
             }
         }
 
-        async function sendDynamic(sliderVal) {
-            if(bleCharacteristic) { try { await bleCharacteristic.writeValue(encoder.encode('D' + sliderVal)); } catch(e){} }
+        async function sendFinalWeight(val) {
+            await sendBluetoothCommand('D' + val);
+        }
+
+        async function sendBluetoothCommand(payload) {
+            if(bleCharacteristic) { try { await bleCharacteristic.writeValue(encoder.encode(payload)); } catch(e){} }
         }
         
         async function toggleDirection() { 
@@ -230,6 +226,8 @@
         async function turnOff() {
             document.getElementById('ledSlider').value = 0;
             document.getElementById('targetNum').innerText = '0%';
+            document.getElementById('valNum').innerText = '0%';
+            document.getElementById('trendIcon').innerText = "";
             if(bleCharacteristic) { try { await bleCharacteristic.writeValue(encoder.encode('X')); } catch(e){} }
         }
 
