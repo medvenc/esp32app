@@ -68,8 +68,8 @@
         }
         #ledSlider::-webkit-slider-thumb { width: 45px; height: 45px; }
         
-        .value-display { font-size: 3.5rem; font-weight: bold; color: #ffffff; margin-bottom: 5px; display: flex; align-items: center; justify-content: center; gap: 10px; }
-        .trend-arrow { font-size: 2.5rem; font-weight: bold; width: 40px; text-align: center; }
+        .value-display { font-size: 3.5rem; font-weight: bold; color: #ffffff; margin-bottom: 5px; display: flex; align-items: center; justify-content: center; gap: 15px; }
+        .trend-arrow { font-size: 2.5rem; font-weight: bold; width: 40px; text-align: center; display: inline-block; }
         .trend-up { color: #00e676; }
         .trend-down { color: #ff1744; }
         .value-title { font-size: 0.9rem; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
@@ -83,7 +83,7 @@
 </head>
 <body>
     <div class="container">
-        <h2>Menet</h2>
+        <h2>Menetszabályzó</h2>
         <p id="statusTxt">Bluetooth: Nincs kapcsolódva</p>
         
         <div class="controls-row">
@@ -128,12 +128,11 @@
         let isForward = true;
         const encoder = new TextEncoder();
 
-        // Valós idejű helyi szimulációs változók
         let currentDisplaySpeed = 0;
-        intTargetSpeed = 0;
-        intWeight = 10;
+        let intTargetSpeed = 0;
+        let intWeight = 10;
         let simInterval = null;
-        let trainState = "E"; // E = Equal, U = Up, D = Down
+        let trainState = "E"; 
 
         let lastSpeedSentTime = 0;
         let lastWeightSentTime = 0;
@@ -166,7 +165,6 @@
                 document.getElementById('brakeBtn').disabled = false;
                 updateVisuals();
 
-                // Elindítjuk a helyi sima kijelző-léptető órát (50ms)
                 startLocalSimulation();
 
                 bleDevice.addEventListener('gattserverdisconnected', () => {
@@ -183,7 +181,7 @@
             if(msg === "DIR_FWD") { isForward = true; updateVisuals(); } 
             else if(msg === "DIR_REV") { isForward = false; updateVisuals(); }
             else if(msg === "U" || msg === "D" || msg === "E") {
-                trainState = msg; // Átvesszük a kártya státuszát!
+                trainState = msg; 
                 updateTrendIcon();
             }
         }
@@ -195,8 +193,7 @@
             else { icon.innerText = ""; }
         }
 
-        // Helyi kijelző léptetés szigorúan a kártyától kapott állapotok szerint!
-        void startLocalSimulation() {
+        function startLocalSimulation() {
             clearInterval(simInterval);
             simInterval = setInterval(() => {
                 if (trainState === "U") {
@@ -208,7 +205,7 @@
                     if (currentDisplaySpeed < intTargetSpeed) currentDisplaySpeed = intTargetSpeed;
                 }
                 else if (trainState === "E") {
-                    currentDisplaySpeed = intTargetSpeed; // Egál esetén azonnal beáll
+                    currentDisplaySpeed = intTargetSpeed; 
                 }
 
                 var roundedSpeed = Math.round(currentDisplaySpeed);
@@ -217,7 +214,7 @@
             }, 50);
         }
 
-        void sendValueRealTime(val) {
+        function sendValueRealTime(val) {
             intTargetSpeed = parseInt(val);
             document.getElementById('targetNum').innerText = val + '%';
             const now = Date.now();
@@ -231,7 +228,7 @@
             if(bleCharacteristic) { try { await bleCharacteristic.writeValue(encoder.encode('V' + val)); } catch(e){} }
         }
 
-        void sendDynamicRealTime(val) {
+        function sendDynamicRealTime(val) {
             var sliderVal = parseInt(val);
             intWeight = Math.round(10 + (sliderVal * 0.9));
             document.getElementById('dynTxt').innerText = intWeight + '%';
@@ -260,7 +257,7 @@
             if(bleCharacteristic) { try { await bleCharacteristic.writeValue(encoder.encode('X')); } catch(e){} }
         }
 
-        void updateVisuals() {
+        function updateVisuals() {
             var boxL = document.getElementById('boxLeft');
             var boxR = document.getElementById('boxRight');
             if(isForward) { boxR.className = "dir-box active-fwd"; boxL.className = "dir-box inactive"; } 
@@ -271,6 +268,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
