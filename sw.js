@@ -1,8 +1,12 @@
-const CACHE_NAME = 'vasut-v1';
-const ASSETS = ['index.html', 'manifest.json', 'ikon.png'];
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
 });
-self.addEventListener('fetch', (e) => {
-  e.respondWith(caches.match(e.request).then((res) => res || fetch(e.request)));
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('fetch', (event) => {
+  // Nem tárolunk semmit a memóriában, mindent élőben a hálózatról kérünk le
+  event.respondWith(fetch(event.request));
 });
