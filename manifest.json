@@ -1,16 +1,23 @@
 {
-  "name": "Vasuti Menetszabalyzo",
-  "short_name": "Vasut",
+  "name": "Medvend Control",
+  "short_name": "Medvend",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#121212",
-  "theme_color": "#00adb5",
+  "theme_color": "#121212",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "ikon.png",
+      "src": "logo.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
