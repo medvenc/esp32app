@@ -1,6 +1,6 @@
 {
-  "name": "Medvend Control",
-  "short_name": "Medvend",
+  "name": "Train Dash",
+  "short_name": "TrainDash",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#121212",
@@ -21,3 +21,4 @@
     }
   ]
 }
+
